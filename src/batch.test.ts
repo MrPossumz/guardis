@@ -5,7 +5,7 @@ Deno.test("batch", () => {
   const { isMeatball, isSausage, isSpaghetti } = batch({
     Meatball: (v) => v === "meatball" ? v : null,
     Sausage: (v) => v === "sausage" ? v : null,
-    Spaghetti: (v) => v === "spaghetti" ? v : null,
+    spaghetti: (v) => v === "spaghetti" ? v : null,
   });
 
   assert(isMeatball);

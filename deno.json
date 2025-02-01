@@ -1,6 +1,6 @@
 {
-	"name": "@mrpossumz/guardis",
-	"version": "0.0.2",
+  "name": "@mrpossumz/guardis",
+  "version": "0.0.3",
   "exports": "./mod.ts",
   "tasks": {
     "dev": {
@@ -10,9 +10,18 @@
     "test": {
       "description": "Run unit tests.",
       "command": "deno test"
-    }
+    },
+		"bench:all":{
+			"description": "Run all library benchmarks on the typeguards to detect slow parsing logic.",
+			"command": "deno bench benchmarks/guard*.bench.ts"
+		},
+		"bench:guards":{
+			"description": "Run library benchmarks on the typeguards to detect slow parsing logic.",
+			"command": "deno bench benchmarks/guard.bench.ts"
+		}
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1"
-  }
+  },
+  "lock": false
 }

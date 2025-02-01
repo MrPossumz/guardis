@@ -3,14 +3,18 @@
  * @module
  */
 
-// A parser is a function that takes an unknown and returns T or null
+import type {
+  JsonArray,
+  JsonObject,
+  JsonPrimitive,
+  JsonValue,
+} from "./types.ts";
+
+/** A parser is a function that takes an unknown and returns T or null */
 export type Parser<T = unknown> = (
   val: unknown,
   has: typeof hasProperty,
 ) => T | null;
-
-// The createTypeGuard function accepts a parser and returns a new function that
-// can be used to validate if the input matches the specified type.
 
 /**
  * Utility to verify if a property exists in an object. Checks that
@@ -131,6 +135,15 @@ export const isUndefined = createTypeGuard((t) =>
 );
 
 /**
+ * Returns true if input is a JSON-able primitive date type
+ * @param {unknown} t
+ * @return {boolean}
+ */
+export const isJsonPrimitive = createTypeGuard<JsonPrimitive>((t) =>
+  isBoolean(t) || isString(t) || isNumber(t) || isNull(t)
+);
+
+/**
  * Returns true if input satisfies type object. _BEWARE_ object
  * can apply to many different types, including arrays. This
  * is not as type safe as you might think.
@@ -148,9 +161,13 @@ export const isObject = createTypeGuard((t) =>
  * @param {unknown} t
  * @return {boolean}
  */
-export const isJsonObject = createTypeGuard((t) => {
+export const isJsonObject = createTypeGuard<JsonObject>((t) => {
   if (t && typeof t === "object" && !Array.isArray(t)) {
-    return t;
+		for (const v of Object.values(t)) {
+			if (!isJsonValue(v)) return null;
+		}
+
+		return t as JsonObject;
   }
 
   return null;
@@ -168,7 +185,17 @@ export const isArray = createTypeGuard((t) => Array.isArray(t) ? t : null);
  * @param {unknown} t
  * @return {boolean}
  */
-export const isJsonArray = createTypeGuard((t) => Array.isArray(t) ? t : null);
+export const isJsonArray = createTypeGuard<JsonArray>((t) =>
+  Array.isArray(t) ? t : null
+);
+
+export const isJsonValue = createTypeGuard<JsonValue>((t) => {
+  if (isJsonPrimitive(t) || isJsonArray(t) || isJsonObject(t)) {
+    return t;
+  }
+
+  return null;
+});
 
 /**
  * Returns true if input satisfies type null.
@@ -202,7 +229,7 @@ isNil.strict = (value: unknown): value is null | undefined => {
 
 /**
  * Returns true if input is undefined, null, empty string, object with length
- * of 0 or object without keys.
+ * of 0 or object without enumerable keys.
  * @param {unknown} t
  * @return {boolean}
  */
