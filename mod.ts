@@ -29,6 +29,7 @@ export const Is = {
   Function: g.isFunction,
   Object: g.isObject,
   Undefined: g.isUndefined,
+	Array: g.isArray,
   JsonPrimitive: g.isJsonPrimitive,
   JsonArray: g.isJsonArray,
   JsonObject: g.isJsonObject,

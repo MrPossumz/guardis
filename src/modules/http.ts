@@ -1,4 +1,4 @@
-import { createTypeGuard } from "../guard.ts";
+import { createTypeGuard, type TypeGuard } from "../guard.ts";
 
 /**
  * Returns true if input is an instance of the native URL
@@ -6,7 +6,7 @@ import { createTypeGuard } from "../guard.ts";
  * @param {unknown} t
  * @return {boolean}
  */
-export const isNativeURL = createTypeGuard((t: unknown) => {
+export const isNativeURL: TypeGuard<URL> = createTypeGuard((t: unknown) => {
   return t instanceof URL ? t : null;
 });
 
@@ -16,7 +16,7 @@ export const isNativeURL = createTypeGuard((t: unknown) => {
  * @param {unknown} t
  * @return {boolean}
  */
-export const isRequest = createTypeGuard((t: unknown) => {
+export const isRequest: TypeGuard<Request> = createTypeGuard((t: unknown) => {
   return t instanceof Request ? t : null;
 });
 
@@ -26,6 +26,6 @@ export const isRequest = createTypeGuard((t: unknown) => {
  * @param {unknown} t
  * @return {boolean}
  */
-export const isResponse = createTypeGuard((t: unknown) => {
-	return t instanceof Response ? t : null;
+export const isResponse: TypeGuard<Response> = createTypeGuard((t: unknown) => {
+  return t instanceof Response ? t : null;
 });
