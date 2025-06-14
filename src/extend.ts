@@ -4,13 +4,11 @@ import { Is } from "../mod.ts";
 
 /** The return Is dictionary, merging both the definitions from the standard library
  * and the custom type guards generated from the GuardExtension record. */
-type ExtendedIs<E extends ParserRecords, I extends typeof Is> =
-  & I
-  & {
-    readonly [key in keyof E]: ReturnType<
-      typeof createTypeGuard<Exclude<ReturnType<E[key]>, null>>
-    >;
-  };
+export type ExtendedIs<E extends ParserRecords, I extends typeof Is> = {
+  [K in keyof I | keyof E]: K extends keyof I ? I[K] : K extends keyof E ? ReturnType<
+    typeof createTypeGuard<Exclude<ReturnType<E[K]>, null>>
+  > : never;
+};
 
 /**
  * Generate a custom Is dictionary using an object with the names of your types
@@ -41,5 +39,5 @@ export function extend<P extends ParserRecords, I extends typeof Is>(
   const entries = Object.entries(config)
     .map(([name, parser]) => [name, createTypeGuard(parser)]);
 
-  return { ...Object.fromEntries(entries), ...(is ?? Is) } as ExtendedIs<P, I>;
+  return { ...Object.fromEntries(entries), ...(is ?? Is) };
 }

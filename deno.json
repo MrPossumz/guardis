@@ -1,15 +1,13 @@
 {
   "name": "@mr-possumz/guardis",
-  "version": "0.0.5",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "Guardis is a modular library of type guards, built to be easy to use and extend.",
   "exports": {
     ".": "./mod.ts",
-    "./http": "./modules/http.ts"
+    "./http": "./src/modules/http.ts"
   },
   "tasks": {
-    "dev": {
-      "description": "Start the dev process.",
-      "command": "deno run --watch main.ts"
-    },
     "test": {
       "description": "Run unit tests.",
       "command": "deno test"
@@ -27,5 +25,8 @@
     "@std/assert": "jsr:@std/assert@^1.0.0"
   },
   "compilerOptions": {},
-  "lock": false
+  "lock": false,
+  "fmt": {
+    "lineWidth": 100
+  }
 }

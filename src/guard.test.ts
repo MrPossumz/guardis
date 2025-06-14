@@ -1,19 +1,27 @@
 import { assert, assertEquals, assertFalse, assertThrows } from "@std/assert";
 import {
   createTypeGuard,
+  hasProperty,
+  includes,
+  isArray,
   isBinary,
   isBoolean,
   isEmpty,
   isFunction,
+  isIterator,
   isJsonArray,
   isJsonObject,
+  isJsonPrimitive,
+  isJsonValue,
   isNil,
   isNull,
   isNumber,
+  isNumeric,
   isObject,
   isString,
   isTuple,
   isUndefined,
+  tupleHas,
 } from "./guard.ts";
 
 Deno.test("createTypeGuard", async (t) => {
@@ -41,8 +49,8 @@ Deno.test("createTypeGuard", async (t) => {
       },
     );
 
-    assertEquals(testGuard('a'), true);
-    assertEquals(testGuard('f'), false);
+    assertEquals(testGuard("a"), true);
+    assertEquals(testGuard("f"), false);
     assertEquals(testGuard([]), false);
     assertEquals(testGuard({}), false);
     assertEquals(testGuard(1), false);
@@ -169,7 +177,7 @@ Deno.test("isNull", async (t) => {
   });
 
   await t.step("strict mode", () => {
-    assert(isNull.strict(null));
+    isNull.strict(null);
     assertThrows(() => isNull.strict(true));
     assertThrows(() => isNull.strict(false));
     assertThrows(() => isNull.strict(0));
@@ -211,11 +219,11 @@ Deno.test("isEmpty", async (t) => {
   );
 
   await t.step("strict mode", () => {
-    assert(isEmpty.strict(null));
-    assert(isEmpty.strict(undefined));
-    assert(isEmpty.strict(""));
-    assert(isEmpty.strict({}));
-    assert(isEmpty.strict([]));
+    isEmpty.strict(null);
+    isEmpty.strict(undefined);
+    isEmpty.strict("");
+    isEmpty.strict({});
+    isEmpty.strict([]);
     assertThrows(() => isEmpty.strict(true));
     assertThrows(() => isEmpty.strict(false));
     assertThrows(() => isEmpty.strict(0));
@@ -236,8 +244,8 @@ Deno.test("isNil", async (t) => {
   });
 
   await t.step("strict mode", () => {
-    assert(isNil.strict(null));
-    assert(isNil.strict(undefined));
+    isNil.strict(null);
+    isNil.strict(undefined);
     assertThrows(() => isNil.strict(true));
     assertThrows(() => isNil.strict(false));
     assertThrows(() => isNil.strict(0));
@@ -257,10 +265,10 @@ Deno.test("strict mode", async (t) => {
   });
 
   await t.step("does not throw on successful typeguard", () => {
-    assert(isBoolean.strict(true));
-    assert(isBoolean.strict(false));
-    assert(isNumber.strict(0));
-    assert(isString.strict("1"));
+    isBoolean.strict(true);
+    isBoolean.strict(false);
+    isNumber.strict(0);
+    isString.strict("1");
   });
 });
 
@@ -272,7 +280,7 @@ Deno.test("notEmpty", () => {
   assertFalse(isString.notEmpty(""));
 });
 
-Deno.test('isTuple', () => {
+Deno.test("isTuple", () => {
   assert(isTuple([], 0));
   assert(isTuple([1], 1));
   assert(isTuple([1, 2], 2));
@@ -286,4 +294,123 @@ Deno.test('isTuple', () => {
   assert(isTuple([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 10));
   assertFalse(isTuple([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 10));
   assertFalse(isTuple([1, 2, 3, 4, 5, 6, 7, 8, 9], 10));
+});
+Deno.test("hasProperty", async (t) => {
+  await t.step("returns true if property exists", () => {
+    const obj = { a: 1, b: "test" };
+    assert(hasProperty(obj, "a"));
+    assert(hasProperty(obj, "b"));
+    assertFalse(hasProperty(obj, "c"));
+  });
+
+  await t.step("returns true if property exists and passes guard", () => {
+    const obj = { a: 1, b: "test" };
+    assert(hasProperty(obj, "a", isNumber));
+    assertFalse(hasProperty(obj, "b", isNumber));
+    assert(hasProperty(obj, "b", isString));
+    assertFalse(hasProperty(obj, "c", isString));
+  });
+});
+
+Deno.test("tupleHas", async (t) => {
+  await t.step("returns true if index exists and passes guard", () => {
+    const tuple = [1, "a", true] as const;
+    assert(tupleHas(tuple, 0, isNumber));
+    assert(tupleHas(tuple, 1, isString));
+    assert(tupleHas(tuple, 2, isBoolean));
+    assertFalse(tupleHas(tuple, 1, isNumber));
+    assertFalse(tupleHas(tuple, 3, isString));
+  });
+});
+
+Deno.test("includes", () => {
+  const arr = [1, 2, 3] as const;
+  assert(includes(arr, 1));
+  assert(includes(arr, 2));
+  assertFalse(includes(arr, 4));
+  assertFalse(includes(arr, "1"));
+});
+
+Deno.test("isNumeric", async (t) => {
+  await t.step("returns true for numbers and numeric strings", () => {
+    assert(isNumeric(1));
+    assert(isNumeric(0));
+    assert(isNumeric("42"));
+    assert(isNumeric("3.14"));
+  });
+
+  await t.step("returns false for non-numeric values", () => {
+    assertFalse(isNumeric("abc"));
+    assertFalse(isNumeric({}));
+    assertFalse(isNumeric([]));
+    assertFalse(isNumeric(null));
+    assertFalse(isNumeric(undefined));
+  });
+});
+
+Deno.test("isJsonPrimitive", () => {
+  assert(isJsonPrimitive(true));
+  assert(isJsonPrimitive(false));
+  assert(isJsonPrimitive(1));
+  assert(isJsonPrimitive("str"));
+  assert(isJsonPrimitive(null));
+  assertFalse(isJsonPrimitive(undefined));
+  assertFalse(isJsonPrimitive({}));
+  assertFalse(isJsonPrimitive([]));
+});
+
+Deno.test("isObject", () => {
+  assert(isObject({}));
+  assert(isObject({ a: 1 }));
+  assertFalse(isObject([]));
+  assertFalse(isObject(null));
+  assertFalse(isObject("str"));
+  assertFalse(isObject(1));
+});
+
+Deno.test("isArray", () => {
+  assert(isArray([]));
+  assert(isArray([1, 2, 3]));
+  assertFalse(isArray({}));
+  assertFalse(isArray("str"));
+  assertFalse(isArray(1));
+  assertFalse(isArray(null));
+});
+
+Deno.test("isJsonValue", () => {
+  assert(isJsonValue(true));
+  assert(isJsonValue(1));
+  assert(isJsonValue("str"));
+  assert(isJsonValue([]));
+  assert(isJsonValue([1, 2, 3]));
+  assert(isJsonValue({}));
+  assert(isJsonValue({ a: 1, b: "str", c: null }));
+  assertFalse(isJsonValue(undefined));
+  assertFalse(isJsonValue({ a: undefined }));
+  assertFalse(isJsonValue({ a: () => {} }));
+});
+
+Deno.test("isIterator", async (t) => {
+  await t.step("returns true for iterators", () => {
+    const arr = [1, 2, 3];
+    const iter = arr[Symbol.iterator]();
+    assert(isIterator(iter));
+  });
+
+  await t.step("returns false for non-iterators", () => {
+    assertFalse(isIterator({}));
+    assertFalse(isIterator(null));
+    assertFalse(isIterator(undefined));
+    assertFalse(isIterator("str"));
+  });
+
+  await t.step("strict mode throws on non-iterators", () => {
+    const arr = [1, 2, 3];
+    const iter = arr[Symbol.iterator]();
+    isIterator.strict(iter);
+    assertThrows(() => isIterator.strict({}));
+    assertThrows(() => isIterator.strict(null));
+    assertThrows(() => isIterator.strict(undefined));
+    assertThrows(() => isIterator.strict("str"));
+  });
 });

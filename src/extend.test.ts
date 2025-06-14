@@ -1,5 +1,6 @@
 import { assert, assertFalse, assertThrows } from "@std/assert";
 import { extend } from "./extend.ts";
+import { createTypeGuard } from "./guard.ts";
 
 Deno.test("extend", async (t) => {
   await t.step("basic", () => {
@@ -19,7 +20,7 @@ Deno.test("extend", async (t) => {
     assertFalse(Is.MySillyType(1));
 
     assert("strict" in Is.MySillyType);
-    assert(Is.MySillyType.strict(10));
+    Is.MySillyType.strict(10);
     assertThrows(() => Is.MySillyType.strict("sausage"));
   });
 
@@ -45,7 +46,7 @@ Deno.test("extend", async (t) => {
     assert("Meatball" in IsTwo);
     assert(IsTwo.Meatball("meatball"));
     assertFalse(IsTwo.Meatball(1));
-		
+
     assertFalse("Sauage" in Is);
   });
 });
