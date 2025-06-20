@@ -150,6 +150,13 @@ export type TypeGuard<T> = {
    */
   (value: unknown): value is T;
   /**
+   * A type guard function that checks if the value is of type T or T2.
+   * This is useful for creating unions of types.
+   * @param guard A type guard for T2
+   * @returns A new type guard that checks if the value is of type T or T2
+   */
+  or: <T2>(guard: TypeGuard<T2>) => TypeGuard<T | T2>;
+  /**
    * A strict type guard that throws an error if the value is not of type T.
    * @param value The value to check
    * @param errorMsg Optional error message to include in the thrown error
@@ -256,6 +263,9 @@ export type TypeGuard<T> = {
   };
 };
 
+/** An internal type guard that includes the parser function. */
+type _TypeGuard<T> = TypeGuard<T> & { _: { parser: Parser<T> } };
+
 /**
  * The createTypeGuard function accepts a parser and returns a new function that
  * can be used to validate an input against a specified type. The parser
@@ -274,7 +284,7 @@ export type TypeGuard<T> = {
  * @param {Function} parse
  * @returns {Function}
  */
-export const createTypeGuard = <T>(parse: Parser<T>): TypeGuard<T> => {
+export const createTypeGuard = <T1>(parse: Parser<T1>): TypeGuard<T1> => {
   const helpers = {
     has: hasProperty,
     hasOptional: hasOptionalProperty,
@@ -282,7 +292,8 @@ export const createTypeGuard = <T>(parse: Parser<T>): TypeGuard<T> => {
     tupleHas,
   };
 
-  const callback = (value: unknown): value is T => parse(value, helpers) !== null;
+  const callback = (value: unknown): value is T1 => parse(value, helpers) !== null;
+  callback._ = { parser: parse };
 
   /**
    * Returns false if the value fails the "empty" type guard
@@ -290,7 +301,7 @@ export const createTypeGuard = <T>(parse: Parser<T>): TypeGuard<T> => {
    * @param {unknown} value
    * @returns
    */
-  const notEmpty = (value: unknown): value is T => !isEmpty(value) && callback(value);
+  const notEmpty = (value: unknown): value is T1 => !isEmpty(value) && callback(value);
 
   notEmpty.strict = createStrictTypeGuard(notEmpty);
   notEmpty.assert = createAssertTypeGuard(notEmpty.strict);
@@ -301,7 +312,7 @@ export const createTypeGuard = <T>(parse: Parser<T>): TypeGuard<T> => {
    * @param {unknown} value
    * @returns
    */
-  const optional = (value: unknown): value is T | undefined =>
+  const optional = (value: unknown): value is T1 | undefined =>
     isUndefined(value) || callback(value);
 
   optional.strict = createStrictTypeGuard(optional);
@@ -317,6 +328,20 @@ export const createTypeGuard = <T>(parse: Parser<T>): TypeGuard<T> => {
    */
   callback.strict = createStrictTypeGuard(callback);
   callback.assert = createAssertTypeGuard(callback.strict);
+
+  /**
+   * Creates a new type guard that checks if the value is of type T1 or T2.
+   * This is useful for creating unions of types.
+   * @param {Function} guard A type guard for T2
+   * @returns {Function} A new type guard that checks if the value is of type T1 or T2
+   */
+  callback.or = <T2>(guard: TypeGuard<T2>): TypeGuard<T1 | T2> => {
+    return createTypeGuard<T1 | T2>((v: unknown) => {
+      const r1 = callback._.parser(v, helpers);
+
+      return r1 !== null ? r1 : (guard as unknown as _TypeGuard<T2>)._.parser(v, helpers);
+    });
+  };
 
   return callback;
 };
@@ -453,6 +478,26 @@ export const isJsonArray: TypeGuard<JsonArray> = createTypeGuard((
   t,
 ): JsonArray | null => Array.isArray(t) ? t : null);
 
+/**
+ * Checks if a given value is a valid JSON value.
+ *
+ * This type guard leverages helper functions to determine if the provided value is a valid JSON
+ * primitive, JSON array, or JSON object. If the value satisfies any of these conditions, it is
+ * considered a valid JSON value.
+ *
+ * @param t - The value to be checked.
+ * @returns The value itself if it is a valid JSON value; otherwise, returns null.
+ *
+ * @remarks
+ * - For primitive types, arrays, and objects, the guard confirms conformance with the JSON value standards.
+ *
+ * @example
+ * const value: unknown = getValue();
+ * const jsonValue = isJsonValue(value);
+ * if (jsonValue !== null) {
+ *   // Work with the confirmed JSON value.
+ * }
+ */
 export const isJsonValue: TypeGuard<JsonValue> = createTypeGuard(
   (t): JsonValue | null => {
     if (isJsonPrimitive(t) || isJsonArray(t) || isJsonObject(t)) {
@@ -486,79 +531,35 @@ export const isDate = createTypeGuard((t) => t instanceof Date ? t : null);
  * @param {unknown} t
  * @return {boolean}
  */
-const isNull = (t: unknown): t is null => t === null;
-
-/**
- * Strict version of isNull that throws a TypeError if the value is not null.
- * @param t - The value to check
- * @returns true if the value is null
- * @throws {TypeError} If the value is not null
- */
-isNull.strict = (t: unknown): t is null => {
-  if (!isNull(t)) {
-    throw TypeError("Type guard failed. Input is not null.");
-  }
-
-  return true;
-};
-
-/**
- * Assertion function that throws an error if the value is not null.
- * TypeScript will narrow the type to null after this assertion.
- * @param t - The value to check
- * @throws {TypeError} If the value is not null
- */
-isNull.assert = createAssertTypeGuard(isNull.strict);
-
-// Define the optional methods for isNull
-const isNullOptional = (t: unknown): t is null | undefined => isUndefined(t) || isNull(t);
-
-isNullOptional.strict = (t: unknown, errorMsg?: string): t is null | undefined => {
-  if (!isNullOptional(t)) {
-    throw TypeError(errorMsg ?? "Type guard failed. Value is not null or undefined.");
-  }
-  return true;
-};
-
-isNullOptional.assert = createAssertTypeGuard(isNullOptional.strict);
-
-/**
- * Optional variant of isNull that accepts undefined or null.
- * @param t - The value to check
- * @returns true if the value is undefined or null, otherwise false
- */
-isNull.optional = isNullOptional;
+const isNull = createTypeGuard<null>((t: unknown) => (t === null ? true : null) as null);
 
 /**
  * Returns true if input satisfies type null or undefined.
  * @param {unknown} t
  * @return {boolean}
  */
-const isNil = (t: unknown): t is null | undefined => isNull(t) || isUndefined(t);
+const isNil = isNull.or(isUndefined);
 
-/**
- * Strict version of isNil that throws a TypeError if the value is not null or undefined.
- * @param t - The value to check
- * @param errorMsg - Optional custom error message
- * @returns true if the value is null or undefined
- * @throws {TypeError} If the value is not null or undefined
- */
-isNil.strict = (t: unknown, errorMsg?: string): t is null | undefined => {
-  if (!isNil(t)) {
-    throw TypeError(errorMsg ?? "Type guard failed. Value is not null or undefined.");
+const isEmptyRecord = createTypeGuard<Record<string, never>>((t): Record<string, never> | null => {
+  if (
+    t && typeof t === "object" && Object.getPrototypeOf(t) === Object.prototype &&
+    Object.keys(t).length === 0
+  ) {
+    return t as Record<string, never>;
   }
+  return null;
+});
 
-  return true;
-};
+const isEmptyArray = createTypeGuard<[]>((t): [] | null => {
+  if (Array.isArray(t) && (t as unknown[]).length === 0) {
+    return t as [];
+  }
+  return null;
+});
 
-/**
- * Assertion function that throws an error if the value is not null or undefined.
- * TypeScript will narrow the type to null | undefined after this assertion.
- * @param t - The value to check
- * @param errorMsg - Optional custom error message
- * @throws {TypeError} If the value is not null or undefined
- */
-isNil.assert = createAssertTypeGuard(isNil.strict);
+const isEmptyString = createTypeGuard<"">((t): "" | null => {
+  return t === "" ? t : null;
+});
 
 /**
  * Returns true if input is undefined, null, empty string, object with length
@@ -566,45 +567,7 @@ isNil.assert = createAssertTypeGuard(isNil.strict);
  * @param {unknown} t
  * @return {boolean}
  */
-const isEmpty = (t: unknown): t is null | undefined | "" | [] | Record<string, never> => {
-  if (
-    t === null || isUndefined(t) || (t === "") ||
-    (Array.isArray(t) && (t as unknown[]).length === 0) ||
-    (t && typeof t === "object" &&
-      Object.getPrototypeOf(t) === Object.prototype && Object.keys(t).length === 0)
-  ) {
-    return true;
-  }
-
-  return false;
-};
-
-/**
- * Strict version of isEmpty that throws a TypeError if the value is not empty.
- * Empty values include: null, undefined, empty string "", empty array [], or empty object {}.
- * @param t - The value to check
- * @param errorMsg - Optional custom error message
- * @returns true if the value is empty
- * @throws {TypeError} If the value is not empty
- */
-isEmpty.strict = (
-  t: unknown,
-  errorMsg?: string,
-): t is null | undefined | "" | [] | Record<string, never> => {
-  if (!isEmpty(t)) {
-    throw TypeError(errorMsg ?? "Type guard failed. Value is not empty.");
-  }
-  return true;
-};
-
-/**
- * Assertion function that throws an error if the value is not empty.
- * TypeScript will narrow the type to null | undefined | "" | [] | {} after this assertion.
- * @param t - The value to check
- * @param errorMsg - Optional custom error message
- * @throws {TypeError} If the value is not empty
- */
-isEmpty.assert = createAssertTypeGuard(isEmpty.strict);
+const isEmpty = isNull.or(isUndefined).or(isEmptyString).or(isEmptyArray).or(isEmptyRecord);
 
 /**
  * Returns true if the value is iterable (has Symbol.iterator). Does not
@@ -612,61 +575,17 @@ isEmpty.assert = createAssertTypeGuard(isEmpty.strict);
  * @param t
  * @returns
  */
-const isIterable = <C>(t: unknown): t is Iterable<C> =>
-  typeof t === "object" && !isNil(t) && Symbol.iterator in t && isFunction(t[Symbol.iterator]);
-
-/**
- * Strict version of isIterable that throws a TypeError if the value is not iterable.
- * @typeParam C - The type of values the iterable yields
- * @param t - The value to check
- * @param errorMsg - Optional custom error message
- * @returns true if the value is iterable
- * @throws {TypeError} If the value is not iterable
- */
-isIterable.strict = <C>(t: unknown, errorMsg?: string): t is Iterable<C> => {
-  if (!isIterable(t)) {
-    throw TypeError(errorMsg ?? "Type guard failed. Value is not iterable.");
+const isIterable = createTypeGuard<Iterable<unknown>>((t) => {
+  if (
+    typeof t === "object" &&
+    !isNil(t) &&
+    Symbol.iterator in t &&
+    isFunction(t[Symbol.iterator])
+  ) {
+    return t as Iterable<unknown>;
   }
-
-  return true;
-};
-
-/**
- * Assertion function that throws an error if the value is not iterable.
- * TypeScript will narrow the type to Iterable<C> after this assertion.
- * @typeParam C - The type of values the iterable yields
- * @param t - The value to check
- * @param errorMsg - Optional custom error message
- * @throws {TypeError} If the value is not iterable
- */
-isIterable.assert = isIterable.strict as <C>(
-  t: unknown,
-  errorMsg?: string,
-) => asserts t is Iterable<C>;
-
-// Define the optional methods for isIterable
-const isIterableOptional = <C>(t: unknown): t is Iterable<C> | undefined =>
-  isUndefined(t) || isIterable<C>(t);
-
-isIterableOptional.strict = <C>(t: unknown, errorMsg?: string): t is Iterable<C> | undefined => {
-  if (!isIterableOptional<C>(t)) {
-    throw TypeError(errorMsg ?? "Type guard failed. Value is not iterable or undefined.");
-  }
-  return true;
-};
-
-isIterableOptional.assert = isIterableOptional.strict as <C>(
-  t: unknown,
-  errorMsg?: string,
-) => asserts t is Iterable<C> | undefined;
-
-/**
- * Optional variant of isIterable that accepts undefined or Iterable<C>.
- * @typeParam C - The type of values the iterable yields
- * @param t - The value to check
- * @returns true if the value is undefined or an Iterable<C>, otherwise false
- */
-isIterable.optional = isIterableOptional;
+  return null;
+});
 
 /**
  * Type guard that checks if a value is a tuple (array) of a specific length.
@@ -733,6 +652,26 @@ isTuple.assert = isTuple.strict as <N extends number>(
   length: N,
   errorMsg?: string,
 ) => asserts t is TupleOfLength<N>;
+
+/**
+ * Creates a union type guard that checks if a value is a tuple of specified length OR matches another type.
+ * @param length - The expected length of the tuple
+ * @param guard - The type guard to combine with isTuple
+ * @returns A new type guard for TupleOfLength<N> | T2
+ */
+isTuple.or = <N extends number, T2>(
+  length: N,
+  guard: TypeGuard<T2>,
+): TypeGuard<TupleOfLength<N> | T2> => {
+  return createTypeGuard<TupleOfLength<N> | T2>((v: unknown) =>
+    isTuple(v, length) ? v : (guard as _TypeGuard<T2>)._.parser(v, {
+      has: hasProperty,
+      hasOptional: hasOptionalProperty,
+      includes,
+      tupleHas,
+    })
+  );
+};
 
 // Define the optional methods for isTuple
 const isTupleOptional = <N extends number>(

@@ -1272,6 +1272,119 @@ Deno.test("createTypeGuard", async (t) => {
     assert(isPositiveInteger.notEmpty(10));
     assertFalse(isPositiveInteger.notEmpty(0));
   });
+
+  await t.step("or method - union type guards", () => {
+    // Create a union type guard for string | number
+    const isStringOrNumber = isString.or(isNumber);
+
+    // Valid inputs - strings
+    assert(isStringOrNumber(TEST_VALUES.string));
+    assert(isStringOrNumber(TEST_VALUES.emptyString));
+
+    // Valid inputs - numbers
+    assert(isStringOrNumber(TEST_VALUES.number));
+    assert(isStringOrNumber(TEST_VALUES.zero));
+    assert(isStringOrNumber(TEST_VALUES.float));
+
+    // Invalid inputs
+    assertFalse(isStringOrNumber(TEST_VALUES.boolean));
+    assertFalse(isStringOrNumber(TEST_VALUES.nullValue));
+    assertFalse(isStringOrNumber(TEST_VALUES.undefinedValue));
+    assertFalse(isStringOrNumber(TEST_VALUES.object));
+    assertFalse(isStringOrNumber(TEST_VALUES.array));
+  });
+
+  await t.step("or method - complex union types", () => {
+    // Create a union type guard for boolean | null | undefined
+    const isBooleanOrNil = isBoolean.or(isNil);
+
+    // Valid inputs
+    assert(isBooleanOrNil(TEST_VALUES.boolean));
+    assert(isBooleanOrNil(TEST_VALUES.booleanFalse));
+    assert(isBooleanOrNil(TEST_VALUES.nullValue));
+    assert(isBooleanOrNil(TEST_VALUES.undefinedValue));
+
+    // Invalid inputs
+    assertFalse(isBooleanOrNil(TEST_VALUES.string));
+    assertFalse(isBooleanOrNil(TEST_VALUES.number));
+    assertFalse(isBooleanOrNil(TEST_VALUES.object));
+    assertFalse(isBooleanOrNil(TEST_VALUES.array));
+  });
+
+  await t.step("or method - chained unions", () => {
+    // Create a union type guard for string | number | boolean
+    const isStringOrNumberOrBoolean = isString.or(isNumber).or(isBoolean);
+
+    // Valid inputs
+    assert(isStringOrNumberOrBoolean(TEST_VALUES.string));
+    assert(isStringOrNumberOrBoolean(TEST_VALUES.number));
+    assert(isStringOrNumberOrBoolean(TEST_VALUES.boolean));
+    assert(isStringOrNumberOrBoolean(TEST_VALUES.booleanFalse));
+
+    // Invalid inputs
+    assertFalse(isStringOrNumberOrBoolean(TEST_VALUES.nullValue));
+    assertFalse(isStringOrNumberOrBoolean(TEST_VALUES.undefinedValue));
+    assertFalse(isStringOrNumberOrBoolean(TEST_VALUES.object));
+    assertFalse(isStringOrNumberOrBoolean(TEST_VALUES.array));
+  });
+
+  await t.step("or method - with custom type guards", () => {
+    // Custom type guard for positive numbers
+    const isPositive = createTypeGuard<number>((val) => {
+      if (typeof val !== "number" || val <= 0) return null;
+      return val;
+    });
+
+    // Custom type guard for negative numbers
+    const isNegative = createTypeGuard<number>((val) => {
+      if (typeof val !== "number" || val >= 0) return null;
+      return val;
+    });
+
+    // Create union for positive or negative (excludes zero)
+    const isNonZero = isPositive.or(isNegative);
+
+    // Valid inputs
+    assert(isNonZero(TEST_VALUES.number)); // 42
+    assert(isNonZero(-10));
+    assert(isNonZero(3.14));
+    assert(isNonZero(-3.14));
+
+    // Invalid inputs
+    assertFalse(isNonZero(TEST_VALUES.zero));
+    assertFalse(isNonZero(TEST_VALUES.string));
+    assertFalse(isNonZero(TEST_VALUES.nullValue));
+  });
+
+  await t.step("or method - all modes work on union guards", () => {
+    const isStringOrNumber = isString.or(isNumber);
+
+    // Strict mode
+    isStringOrNumber.strict(TEST_VALUES.string);
+    isStringOrNumber.strict(TEST_VALUES.number);
+    assertThrows(() => isStringOrNumber.strict(TEST_VALUES.boolean));
+    assertThrows(() => isStringOrNumber.strict(TEST_VALUES.nullValue));
+
+    // Assert mode
+    const assertIsStringOrNumber: typeof isStringOrNumber.assert = isStringOrNumber.assert;
+    assertIsStringOrNumber(TEST_VALUES.string);
+    assertIsStringOrNumber(TEST_VALUES.number);
+    assertThrows(() => assertIsStringOrNumber(TEST_VALUES.boolean));
+
+    // Optional mode
+    assert(isStringOrNumber.optional(TEST_VALUES.string));
+    assert(isStringOrNumber.optional(TEST_VALUES.number));
+    assert(isStringOrNumber.optional(TEST_VALUES.undefinedValue));
+    assertFalse(isStringOrNumber.optional(TEST_VALUES.boolean));
+    assertFalse(isStringOrNumber.optional(TEST_VALUES.nullValue));
+
+    // NotEmpty mode
+    assert(isStringOrNumber.notEmpty(TEST_VALUES.string));
+    assert(isStringOrNumber.notEmpty(TEST_VALUES.number));
+    assertFalse(isStringOrNumber.notEmpty(TEST_VALUES.emptyString));
+    assertFalse(isStringOrNumber.notEmpty(TEST_VALUES.boolean));
+    assertFalse(isStringOrNumber.notEmpty(TEST_VALUES.nullValue));
+  });
 });
 
 Deno.test("hasProperty", async (t) => {
